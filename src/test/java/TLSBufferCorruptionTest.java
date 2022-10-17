@@ -51,7 +51,14 @@ public class TLSBufferCorruptionTest {
                 .flatMapObservable(file -> file.setReadBufferSize(streamChunkSize).toObservable())
                 .concatMap(buffer -> {
                     assertTrue(buffer.length() > 10);
-                    int sliceAt = 2 + random.nextInt(buffer.length() - 5);
+                    // random split -> some differences
+                    //int sliceAt = 2 + random.nextInt(buffer.length() - 5);
+                    // split at half -> no differences as long as first half < 16k
+                    //int sliceAt = buffer.length() / 2;
+                    // split at 100 -> no differences because first half < 16k
+                    //int sliceAt = 100;
+                    // first half above 16k -> evey chunk is corrupted
+                    int sliceAt = 16600 < buffer.length() ? 16600 : 10;
                     int radomDelay = 100 + random.nextInt(200);
                     // the slicing bellow is purely to simulate a multicast server that is possible in case
                     // the written buffer is considered read only so it is not changed in any way by the subscriber
