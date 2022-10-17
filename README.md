@@ -55,7 +55,7 @@ vbindiff data/file_in data/file_out
 All I can say is that the delivery of the http mechanism modifies the input buffer stream which should not happen as
 far as I can tell. The issue does not happen if:
  * tls is disabled (see the `useSSL` flag)
- * if the max chunk size is reduced bellow 32000
+ * if the stream chunk size is above 16k (TLS record size?)
  * if the buffer stream is copied (which must be avoided because of performance issues - thousands of connections consuming the same data)
 
 ### Related issues

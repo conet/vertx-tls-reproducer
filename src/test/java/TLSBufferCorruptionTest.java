@@ -30,9 +30,11 @@ public class TLSBufferCorruptionTest {
 
     private static final String KEYSTORE_PATH = "config/keystore.jks";
     private static final String KEYSTORE_PASS = "secret";
+    //private static final Set<String> TLS_ENABLED_PROTOCOLS = Set.of("TLSv1.3", "TLSv1.2");
+    private static final Set<String> TLS_ENABLED_PROTOCOLS = Set.of("TLSv1.1");
     private static final boolean useSSL = true;
-    private static final int streamChunkSize = 32000;
-    private static final int maxChunkSize = 16000;
+    private static final int streamChunkSize = 17000;
+    private static final int maxChunkSize = 8192;
     private static final int port = 16969;
     Vertx vertx = Vertx.vertx();
 
@@ -98,7 +100,7 @@ public class TLSBufferCorruptionTest {
                 .setSsl(useSSL)
                 .setAlpnVersions(Arrays.asList(HttpVersion.HTTP_1_1))
                 .setSslEngineOptions(new OpenSSLEngineOptions())
-                .setEnabledSecureTransportProtocols(Set.of("TLSv1.3", "TLSv1.2"))
+                .setEnabledSecureTransportProtocols(TLS_ENABLED_PROTOCOLS)
                 .setMaxChunkSize(maxChunkSize)
                 .setKeyStoreOptions(new JksOptions()
                         .setPath(KEYSTORE_PATH)
@@ -110,7 +112,7 @@ public class TLSBufferCorruptionTest {
         return new HttpClientOptions()
                 .setProtocolVersion(HttpVersion.HTTP_1_1)
                 .setSslEngineOptions(new OpenSSLEngineOptions())
-                .setEnabledSecureTransportProtocols(Set.of("TLSv1.3", "TLSv1.2"))
+                .setEnabledSecureTransportProtocols(TLS_ENABLED_PROTOCOLS)
                 .setMaxChunkSize(maxChunkSize)
                 .setSsl(useSSL)
                 .setTrustAll(true)
