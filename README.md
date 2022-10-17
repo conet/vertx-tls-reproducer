@@ -42,7 +42,7 @@ Here is one example:
 
 Please notice this sequence `0D 0A  31 0D 0A 00 0D 0A 31 65` overwriting the input sequence of `74 AC  E6 8F 68 0D 61 AF 8F 72`.
 
-I used this tool to do the binary diff:
+I used [this tool](https://www.cjmweb.net/vbindiff/) to do the binary diff (can be installed with `brew install vbindiff`):
 
 ```shell
 vbindiff data/file_in data/file_out
@@ -54,4 +54,8 @@ All I can say is that the delivery of the http mechanism modifies the input buff
 far as I can tell. The issue does not happen if:
  * tls is disabled (see the `useSSL` flag)
  * if the max chunk size is reduced bellow 32000
- * if the buffer stream is copied (which must must be avoided because of performance issues - thousands of connections consuming the same data)
+ * if the buffer stream is copied (which must be avoided because of performance issues - thousands of connections consuming the same data)
+
+### Related issues
+
+What is happening here could be caused by a netty issue like [this](https://github.com/netty/netty/issues/11792) fixed issue
