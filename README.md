@@ -27,7 +27,7 @@ After the test is run with the current configuration the expected result is that
 
 ### Actual results
 
-The files are different file out will contain several sequences of 0x0A0D (CRLF) which are probably *added to the buffer*
+The files are different file out will contain several sequences of 0x0D0A (CRLF) which are probably *added to the buffer*
 (thus changing it) while delivering the stream.
 
 Here is one example:
