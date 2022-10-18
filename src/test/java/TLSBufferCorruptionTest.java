@@ -17,9 +17,7 @@ import io.vertx.rxjava3.core.http.HttpServerRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.util.Arrays;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static io.vertx.core.http.HttpMethod.GET;
@@ -30,11 +28,9 @@ public class TLSBufferCorruptionTest {
 
     private static final String KEYSTORE_PATH = "config/keystore.jks";
     private static final String KEYSTORE_PASS = "secret";
-    private static final Set<String> TLS_ENABLED_PROTOCOLS = Set.of("TLSv1.3");
-    //private static final Set<String> TLS_ENABLED_PROTOCOLS = Set.of("TLSv1.1");
     private static final boolean useSSL = true;
     private static final int streamChunkSize = 64000;
-    private static final int maxChunkSize = 8192;
+    private static final int sliceSize = 4000;
     private static final int port = 16969;
     Vertx vertx = Vertx.vertx();
 
@@ -48,20 +44,20 @@ public class TLSBufferCorruptionTest {
         Observable<Buffer> dataStream = fileSystem.rxOpen("data/file_in", new OpenOptions())
                 .flatMapObservable(file -> file.setReadBufferSize(streamChunkSize).toObservable())
                 .concatMap(buffer -> {
-                    assertTrue(buffer.length() > 10);
-                    // random split -> some differences
-                    //int sliceAt = 2 + random.nextInt(buffer.length() - 5);
-                    // split at half -> no differences as long as first half < 16k
-                    int sliceAt = buffer.length() / 2;
-                    // split at 100 -> no differences because first half < 16k
-                    //int sliceAt = 100;
-                    // first half above 16k -> evey chunk is corrupted
-                    //int sliceAt = 16600 < buffer.length() ? 16600 : 10;
+                    int nrOfSlices = buffer.length() / sliceSize;
+                    List<Buffer> slices = new ArrayList<>();
+                    for (int i = 0; i < nrOfSlices; ++i) {
+                        slices.add(buffer.slice(i * sliceSize, (i + 1) * sliceSize));
+                    }
+                    // append whatever remains
+                    if (nrOfSlices * sliceSize < buffer.length()) {
+                        slices.add(buffer.slice(nrOfSlices * sliceSize, buffer.length()));
+                    }
                     int radomDelay = 100 + random.nextInt(200);
                     // the slicing bellow is purely to simulate a multicast server that is possible in case
                     // the written buffer is considered read only so it is not changed in any way by the subscriber
                     return Observable
-                            .fromIterable(Arrays.asList(buffer.slice(0, sliceAt), buffer.slice(sliceAt, buffer.length())))
+                            .fromIterable(slices)
                             .delay(radomDelay, TimeUnit.MILLISECONDS);
                 });
 
@@ -100,8 +96,6 @@ public class TLSBufferCorruptionTest {
                 .setSsl(useSSL)
                 .setAlpnVersions(Arrays.asList(HttpVersion.HTTP_1_1))
                 .setSslEngineOptions(new OpenSSLEngineOptions())
-                .setEnabledSecureTransportProtocols(TLS_ENABLED_PROTOCOLS)
-                .setMaxChunkSize(maxChunkSize)
                 .setKeyStoreOptions(new JksOptions()
                         .setPath(KEYSTORE_PATH)
                         .setPassword(KEYSTORE_PASS)
@@ -112,8 +106,6 @@ public class TLSBufferCorruptionTest {
         return new HttpClientOptions()
                 .setProtocolVersion(HttpVersion.HTTP_1_1)
                 .setSslEngineOptions(new OpenSSLEngineOptions())
-                .setEnabledSecureTransportProtocols(TLS_ENABLED_PROTOCOLS)
-                .setMaxChunkSize(maxChunkSize)
                 .setSsl(useSSL)
                 .setTrustAll(true)
                 .setVerifyHost(false);
