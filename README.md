@@ -11,9 +11,7 @@ The structure used to set up the SSL server was taken from [this project](https:
 
 `TLSBufferCorruptionTest` contains a test that creates a read only buffer stream built from stitching together
 multiple buffer slices read from an input file `data/file_in` containing random bytes. This stream is delivered as a
-http response which it is saved to an output file `data/file_out` that should contain the same data. The stream is
-interleaved with 1 byte buffers of 0x00 which are filtered when writing. The code is setup like this to match a real
-life scenario as close as possible.
+http response which it is saved to an output file `data/file_out` that should contain the same data.
 
 Before running anything please generate the input file using this script:
 
