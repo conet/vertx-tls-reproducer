@@ -44,7 +44,8 @@ public class TLSBufferCorruptionTest {
         Observable<Buffer> dataStream = fileSystem.rxOpen("data/file_in", new OpenOptions())
                 .flatMapObservable(file -> file.setReadBufferSize(streamChunkSize).toObservable())
                 // transforming the buffer into a read-only buffer fixes the problem, the slices are no longer corrupted
-                .map(buffer -> Buffer.buffer(buffer.getByteBuf().asReadOnly()))
+                //.map(buffer -> Buffer.buffer(buffer.getByteBuf().asReadOnly()))
+                .map(buffer -> Buffer.buffer(new TestByteBuff(buffer.getByteBuf())))
                 .concatMap(buffer -> {
                     int nrOfSlices = buffer.length() / sliceSize;
                     List<Buffer> slices = new ArrayList<>();
