@@ -21,6 +21,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 import static io.vertx.core.http.HttpMethod.GET;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(VertxExtension.class)
@@ -29,6 +30,7 @@ public class TLSBufferCorruptionTest {
     private static final String KEYSTORE_PATH = "config/keystore.jks";
     private static final String KEYSTORE_PASS = "secret";
     private static final boolean useSSL = true;
+    private static final boolean useReadOnly = false;
     private static final int streamChunkSize = 64000;
     private static final int sliceSize = 4000;
     private static final int port = 16969;
@@ -38,14 +40,19 @@ public class TLSBufferCorruptionTest {
     void test() throws Throwable {
         VertxTestContext testContext = new VertxTestContext();
         Random random = new Random();
+        final List<Buffer> bufferList = new ArrayList<>();
+        for (int i = 0; i < 3; ++i) {
+            Buffer data = Buffer.buffer(streamChunkSize);
+            for (int j = 0; j < streamChunkSize; ++j) {
+                data.setByte(j, (byte)random.nextInt(255));
+            }
+            bufferList.add(data);
+        }
 
-        FileSystem fileSystem = vertx.fileSystem();
         // build a stream of sliced read-only buffers
-        Observable<Buffer> dataStream = fileSystem.rxOpen("data/file_in", new OpenOptions())
-                .flatMapObservable(file -> file.setReadBufferSize(streamChunkSize).toObservable())
+        Observable<Buffer> dataStream = Observable.fromIterable(bufferList)
                 // transforming the buffer into a read-only buffer fixes the problem, the slices are no longer corrupted
-                //.map(buffer -> Buffer.buffer(buffer.getByteBuf().asReadOnly()))
-                .map(buffer -> Buffer.buffer(new TestByteBuff(buffer.getByteBuf())))
+                .map(buffer -> useReadOnly ? Buffer.buffer(buffer.getByteBuf().asReadOnly()) : buffer)
                 .concatMap(buffer -> {
                     int nrOfSlices = buffer.length() / sliceSize;
                     List<Buffer> slices = new ArrayList<>();
@@ -69,20 +76,30 @@ public class TLSBufferCorruptionTest {
                 .listen(port)
                 .flatMap(server -> vertx.createHttpClient(createClientOptions()).rxRequest(new RequestOptions().setMethod(GET).setHost("localhost").setPort(port)))
                 .flatMap(request -> request.rxSend())
-                .subscribe(response -> {
-                    final Flowable<Buffer> responseStream = response.toFlowable();
-                    fileSystem
-                            .rxOpen("data/file_out", new OpenOptions())
-                            .subscribe(file ->
-                                    responseStream
-                                            .doFinally(() -> testContext.completeNow())
-                                            .subscribe(file.toSubscriber()));
-                });
+                .flatMapObservable(response -> response.toFlowable().toObservable())
+                .scan(0, (index, buffer) -> checkBuffer(buffer, index, bufferList))
+                .subscribe(buffer -> {}, cause -> testContext.failNow(cause), () -> testContext.completeNow());
 
         assertTrue(testContext.awaitCompletion(120, TimeUnit.SECONDS));
         if (testContext.failed()) {
             throw testContext.causeOfFailure();
         }
+    }
+
+    private Integer checkBuffer(Buffer buffer, Integer index, List<Buffer> bufferList) {
+        for (int i = 0; i < buffer.length(); ++i) {
+            assertEquals(buffer.getByte(i), getByteAt(index + i, bufferList), "Byte mismatch at index: " + (index + i));
+        }
+        return index + buffer.length();
+    }
+
+    private byte getByteAt(Integer index, List<Buffer> bufferList) {
+        int listIndex = index / streamChunkSize;
+        assertTrue(listIndex < bufferList.size());
+        Buffer buffer = bufferList.get(listIndex);
+        int bufferIndex = index % streamChunkSize;
+        assertTrue(bufferIndex < buffer.length());
+        return buffer.getByte(bufferIndex);
     }
 
     private void handleRequest(HttpServerRequest request, Observable<Buffer> responseStream) {
